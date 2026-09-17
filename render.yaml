@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: pega-mock-bank-apis
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: SEARCH_API_KEYS
+        value: pega-team01-8f2c1a,pega-team02-3d9e7b,pega-team03-b1a4f6,pega-team04-e6c2d9,pega-team05-77af03,pega-team06-c94b1e,pega-team07-2a8d5c,pega-team08-f03e91,pega-team09-4b7c2a,pega-team10-9e1f68
+      - key: OAUTH_CLIENT_ID
+        value: pega-bank-client
+      - key: OAUTH_CLIENT_SECRET
+        value: pega-bank-secret
+      - key: JWT_SECRET
+        generateValue: true
+      - key: TOKEN_TTL_SECONDS
+        value: "3600"

@@ -1,0 +1,67 @@
+{
+  "info": {
+    "name": "Pega Training - Mock Bank APIs",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "apiKey", "value": "pega-team01-8f2c1a" },
+    { "key": "lastName", "value": "Berger" },
+    { "key": "dateOfBirth", "value": "1992-02-03" },
+    { "key": "ssn", "value": "111-22-1001" },
+    { "key": "accessToken", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1a. Applicant Search - ambiguous (multiple matches) - GET",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+        "url": "{{baseUrl}}/applicants/v1/search?lastName={{lastName}}"
+      }
+    },
+    {
+      "name": "1b. Applicant Search - disambiguated with DOB - GET",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+        "url": "{{baseUrl}}/applicants/v1/search?lastName={{lastName}}&dateOfBirth={{dateOfBirth}}"
+      }
+    },
+    {
+      "name": "2. OAuth2 Token (Client Credentials) - POST",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.collectionVariables.set('accessToken', json.access_token);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            { "key": "grant_type", "value": "client_credentials" },
+            { "key": "client_id", "value": "pega-bank-client" },
+            { "key": "client_secret", "value": "pega-bank-secret" }
+          ]
+        },
+        "url": "{{baseUrl}}/oauth/token"
+      }
+    },
+    {
+      "name": "3. Credit Bureau Score (Bearer) - GET",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+        "url": "{{baseUrl}}/credit-bureau/v1/creditscore/{{ssn}}"
+      }
+    }
+  ]
+}
