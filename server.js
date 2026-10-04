@@ -1,204 +1,128 @@
+// ---------------------------------------------------------------------------
+// Pega Training Mock APIs
+//
+// One Express app serving two independent sets of mock services:
+//
+//   1. Mock Bank APIs      — Large App Build (loan origination, English)
+//      /applicants/v1, /oauth/token, /credit-bureau/v1
+//
+//   2. Mobile Club Nord    — Pega AI Week (membership + card, German)
+//      /mcn/mitglieder/v1, /mcn/karten/v1
+//
+// They share a process (one Render free-tier instance = one cold start instead
+// of three) but nothing else: separate data, separate API key sets, separate
+// OpenAPI documents.
+// ---------------------------------------------------------------------------
+
 const express = require("express");
 const morgan = require("morgan");
-const jwt = require("jsonwebtoken");
+
+const bank = require("./routes/bank");
+const mcnMitglieder = require("./routes/mcn-mitglieder");
+const mcnKarten = require("./routes/mcn-karten");
+const { loadKeys, apiKeyGuard } = require("./lib/auth");
 const { applicants } = require("./data");
+const { mitglieder } = require("./data-mcn");
+const openapiMitglieder = require("./openapi/mcn-mitglieder.json");
+const openapiKarten = require("./openapi/mcn-karten.json");
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan("tiny"));
 
-// ---------------------------------------------------------------------------
-// Configuration (env vars let the instructor rotate credentials per class,
-// or run several isolated instances). Defaults are printed at startup.
-// ---------------------------------------------------------------------------
 const PORT = process.env.PORT || 3000;
 
-// 10 API keys — one per junior/team — so the instructor can tell who's calling,
-// revoke a single student's key without affecting the class, or hand out a
-// fresh batch for the next cohort. Override with a comma-separated
-// SEARCH_API_KEYS env var to use different values; otherwise these defaults apply.
-const SEARCH_API_KEYS = (
-  process.env.SEARCH_API_KEYS ||
-  [
-    "pega-team01-8f2c1a",
-    "pega-team02-3d9e7b",
-    "pega-team03-b1a4f6",
-    "pega-team04-e6c2d9",
-    "pega-team05-77af03",
-    "pega-team06-c94b1e",
-    "pega-team07-2a8d5c",
-    "pega-team08-f03e91",
-    "pega-team09-4b7c2a",
-    "pega-team10-9e1f68",
-  ].join(",")
-)
-  .split(",")
-  .map((k) => k.trim())
-  .filter(Boolean);
-
-const OAUTH_CLIENT_ID = process.env.OAUTH_CLIENT_ID || "pega-bank-client";
-const OAUTH_CLIENT_SECRET = process.env.OAUTH_CLIENT_SECRET || "pega-bank-secret";
-const JWT_SECRET = process.env.JWT_SECRET || "training-jwt-signing-secret-change-me";
-const TOKEN_TTL_SECONDS = parseInt(process.env.TOKEN_TTL_SECONDS || "3600", 10);
+// Mobile Club Nord keys are a SEPARATE set from the bank keys, so the AI Week
+// cohort and the LAB cohort can be managed (and revoked) independently.
+const MCN_API_KEYS = loadKeys("MCN_API_KEYS", [
+  "mcn-team01-4ab19c",
+  "mcn-team02-7fe30d",
+  "mcn-team03-c25b84",
+  "mcn-team04-19da6f",
+  "mcn-team05-b8027e",
+  "mcn-team06-5c6a13",
+  "mcn-team07-e4719b",
+  "mcn-team08-20fd58",
+  "mcn-team09-96c3e7",
+  "mcn-team10-d781f2",
+]);
 
 // ---------------------------------------------------------------------------
-// Landing page — lists everything so students can sanity-check the base URL
-// in a browser before they build the Pega connectors.
+// Landing page — lets trainees sanity-check the base URL in a browser before
+// they build any connector.
 // ---------------------------------------------------------------------------
 app.get("/", (req, res) => {
   res.json({
-    service: "Pega Training Mock Bank APIs",
-    seededApplicantIds: Object.keys(applicants),
-    endpoints: [
-      {
-        step: 1,
-        name: "Applicant Search",
-        method: "GET",
-        path: "/applicants/v1/search?firstName=&lastName=&dateOfBirth=",
-        auth: "API Key header (x-api-key)",
+    service: "Pega Training Mock APIs",
+    useCases: {
+      largeAppBuild: {
+        name: "Mock Bank APIs — loan origination",
+        auth: "x-api-key (SEARCH_API_KEYS) and OAuth2 client credentials",
+        seededApplicants: Object.keys(applicants).length,
+        endpoints: [
+          { step: 1, method: "GET", path: "/applicants/v1/search?firstName=&lastName=&dateOfBirth=", auth: "API Key (x-api-key)" },
+          { step: 2, method: "POST", path: "/oauth/token", auth: "none — this IS the auth call" },
+          { step: 3, method: "GET", path: "/credit-bureau/v1/creditscore/:ssn", auth: "OAuth2 Bearer" },
+        ],
       },
-      {
-        step: 2,
-        name: "OAuth2 Token",
-        method: "POST",
-        path: "/oauth/token",
-        auth: "none (this IS the auth call)",
+      aiWeek: {
+        name: "Mobile Club Nord — Mitgliedschaft und Kartenproduktion",
+        auth: "x-api-key (MCN_API_KEYS)",
+        seededMembers: Object.keys(mitglieder).length,
+        endpoints: [
+          { method: "POST", path: "/mcn/mitglieder/v1/mitglieder/suche", auth: "API Key (x-api-key)" },
+          { method: "POST", path: "/mcn/mitglieder/v1/mitglieder", auth: "API Key (x-api-key)" },
+          { method: "GET", path: "/mcn/mitglieder/v1/mitglieder/:mitgliedsnummer", auth: "API Key (x-api-key)" },
+          { method: "POST", path: "/mcn/karten/v1/kartenauftraege", auth: "API Key (x-api-key)" },
+          { method: "GET", path: "/mcn/karten/v1/kartenauftraege/:auftragsnummer", auth: "API Key (x-api-key)" },
+          { method: "POST", path: "/mcn/karten/v1/kartenauftraege/:auftragsnummer/stornierung", auth: "API Key (x-api-key)" },
+        ],
+        openapi: [
+          "/mcn/mitglieder/v1/openapi.json",
+          "/mcn/karten/v1/openapi.json",
+        ],
       },
-      {
-        step: 3,
-        name: "Credit Bureau Score",
-        method: "GET",
-        path: "/credit-bureau/v1/creditscore/:ssn",
-        auth: "OAuth2 Bearer token from /oauth/token",
-      },
-    ],
+    },
+    health: "/health",
     docs: "See README.md in the delivered project for full request/response examples.",
   });
 });
 
 app.get("/health", (req, res) => res.json({ status: "ok", time: new Date().toISOString() }));
 
-// ---------------------------------------------------------------------------
-// SERVICE 1 — Applicant Search — API Key — GET (query params)
-// Maps to Pega "API Key" authentication profile on a Connect REST rule.
-//
-// Business role: the loan officer only has what the applicant said on the
-// phone (name, maybe DOB) — no stable ID yet. This search resolves that into
-// an applicantId + ssn, which step 3 (Credit Bureau) requires. A name-only
-// search can legitimately return more than one match (see APP1002/APP1007
-// and APP1006/APP1008 in data.js), so the case needs a "select the right
-// match" step — same as a real MDM/CIF lookup would require.
-// ---------------------------------------------------------------------------
-function requireApiKey(req, res, next) {
-  const key = req.headers["x-api-key"];
-  if (!key || !SEARCH_API_KEYS.includes(key)) {
-    return res.status(401).json({ error: "unauthorized", message: "Missing or invalid x-api-key header" });
-  }
-  next();
-}
+// --- Large App Build ---------------------------------------------------------
+app.use("/", bank.router);
 
-app.get("/applicants/v1/search", requireApiKey, (req, res) => {
-  const { firstName, lastName, dateOfBirth } = req.query;
+// --- Pega AI Week ------------------------------------------------------------
+// OpenAPI documents are served WITHOUT auth on purpose: trainees point Pega's
+// REST integration wizard (or an AI assistant) at these URLs to generate the
+// connector, and that fetch carries no API key.
+app.get("/mcn/mitglieder/v1/openapi.json", (req, res) => res.json(openapiMitglieder));
+app.get("/mcn/karten/v1/openapi.json", (req, res) => res.json(openapiKarten));
 
-  if (!firstName && !lastName) {
-    return res.status(400).json({
-      error: "bad_request",
-      message: "Provide at least firstName or lastName to search",
-    });
-  }
-
-  const norm = (s) => (s || "").trim().toLowerCase();
-
-  const matches = Object.values(applicants).filter((a) => {
-    if (firstName && norm(a.firstName) !== norm(firstName)) return false;
-    if (lastName && norm(a.lastName) !== norm(lastName)) return false;
-    if (dateOfBirth && a.dateOfBirth !== dateOfBirth) return false;
-    return true;
-  });
-
-  res.json({
-    query: { firstName: firstName || null, lastName: lastName || null, dateOfBirth: dateOfBirth || null },
-    matchCount: matches.length,
-    results: matches.map((a) => ({
-      applicantId: a.applicantId,
-      ssn: a.ssn,
-      firstName: a.firstName,
-      lastName: a.lastName,
-      dateOfBirth: a.dateOfBirth,
-      address: a.address,
-      employmentStatus: a.employmentStatus,
-      annualIncome: a.annualIncome,
-    })),
-  });
-});
-
-// ---------------------------------------------------------------------------
-// SERVICE 2 — Credit Bureau — OAuth2 Client Credentials — POST /oauth/token, GET score
-// Maps to Pega "OAuth 2.0" authentication profile, grant type Client Credentials.
-// ---------------------------------------------------------------------------
-app.post("/oauth/token", (req, res) => {
-  const grantType = req.body.grant_type;
-  const clientId = req.body.client_id || req.headers["x-client-id"];
-  const clientSecret = req.body.client_secret || req.headers["x-client-secret"];
-
-  if (grantType !== "client_credentials") {
-    return res.status(400).json({ error: "unsupported_grant_type", message: "Use grant_type=client_credentials" });
-  }
-  if (clientId !== OAUTH_CLIENT_ID || clientSecret !== OAUTH_CLIENT_SECRET) {
-    return res.status(401).json({ error: "invalid_client", message: "Invalid client_id or client_secret" });
-  }
-
-  const accessToken = jwt.sign({ client_id: clientId, scope: "creditscore.read" }, JWT_SECRET, {
-    expiresIn: TOKEN_TTL_SECONDS,
-  });
-
-  res.json({
-    access_token: accessToken,
-    token_type: "Bearer",
-    expires_in: TOKEN_TTL_SECONDS,
-    scope: "creditscore.read",
-  });
-});
-
-function requireBearerToken(req, res, next) {
-  const header = req.headers.authorization || "";
-  const [scheme, token] = header.split(" ");
-  if (scheme !== "Bearer" || !token) {
-    return res.status(401).json({ error: "unauthorized", message: "Bearer token required. Call POST /oauth/token first." });
-  }
-  try {
-    req.tokenPayload = jwt.verify(token, JWT_SECRET);
-    next();
-  } catch (err) {
-    return res.status(401).json({ error: "invalid_token", message: "Token is invalid or expired. Fetch a new one from /oauth/token." });
-  }
-}
-
-app.get("/credit-bureau/v1/creditscore/:ssn", requireBearerToken, (req, res) => {
-  const applicant = Object.values(applicants).find((a) => a.ssn === req.params.ssn);
-  if (!applicant) {
-    return res.status(404).json({ error: "not_found", message: `No credit record for SSN ${req.params.ssn}` });
-  }
-  res.json({
-    ssn: applicant.ssn,
-    applicantId: applicant.applicantId,
-    creditScore: applicant.creditScore,
-    riskBand: applicant.riskBand,
-    bureau: "Pega Training Mock Bureau",
-    scoreModel: "FICO-Mock-8",
-    asOfDate: new Date().toISOString().slice(0, 10),
-  });
-});
+app.use("/mcn/mitglieder/v1", apiKeyGuard(MCN_API_KEYS, "MCN Bestandssystem"), mcnMitglieder);
+app.use("/mcn/karten/v1", apiKeyGuard(MCN_API_KEYS, "MCN Kartenproduktion"), mcnKarten);
 
 // ---------------------------------------------------------------------------
 app.use((req, res) => {
   res.status(404).json({ error: "not_found", message: `No route for ${req.method} ${req.path}` });
 });
 
-app.listen(PORT, () => {
-  console.log(`Pega Mock Bank APIs listening on port ${PORT}`);
-  console.log(`API Keys (Applicant Search, ${SEARCH_API_KEYS.length} total): ${SEARCH_API_KEYS.join(", ")}`);
-  console.log(`OAuth2 Client Credentials:  ${OAUTH_CLIENT_ID} / ${OAUTH_CLIENT_SECRET}`);
-  console.log(`Seeded applicants: ${Object.keys(applicants).length}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Pega Training Mock APIs listening on port ${PORT}`);
+    console.log("");
+    console.log("  Large App Build — Mock Bank APIs");
+    console.log(`    API keys (${bank.SEARCH_API_KEYS.length}): ${bank.SEARCH_API_KEYS.join(", ")}`);
+    console.log(`    OAuth2: ${bank.OAUTH_CLIENT_ID} / ${bank.OAUTH_CLIENT_SECRET}`);
+    console.log(`    Seeded applicants: ${Object.keys(applicants).length}`);
+    console.log("");
+    console.log("  Pega AI Week — Mobile Club Nord");
+    console.log(`    API keys (${MCN_API_KEYS.length}): ${MCN_API_KEYS.join(", ")}`);
+    console.log(`    Seeded members: ${Object.keys(mitglieder).length}`);
+    console.log("");
+  });
+}
+
+module.exports = app;

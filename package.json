@@ -1,11 +1,14 @@
 {
   "name": "pega-mock-bank-apis",
-  "version": "1.0.0",
-  "description": "Mock banking APIs for Pega System Architect training: Identity Verification (Basic Auth), Credit Bureau (OAuth2 Client Credentials), Loan Decision (API Key).",
+  "version": "2.0.0",
+  "description": "Mock REST services for Pega System Architect training. Large App Build: Applicant Search (API Key) + Credit Bureau (OAuth2 Client Credentials). Pega AI Week: Mobile Club Nord Mitglieder-Bestandssystem and Kartenproduktion (API Key).",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "test": "node scripts/smoke-test.js",
+    "generate:bank": "node scripts/generate-data.js",
+    "generate:mcn": "node scripts/generate-mcn-data.js"
   },
   "engines": {
     "node": ">=18"

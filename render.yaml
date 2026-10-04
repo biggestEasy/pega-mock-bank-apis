@@ -6,6 +6,7 @@ services:
     buildCommand: npm install
     startCommand: npm start
     envVars:
+      # --- Large App Build: Mock Bank APIs -----------------------------------
       - key: SEARCH_API_KEYS
         value: pega-team01-8f2c1a,pega-team02-3d9e7b,pega-team03-b1a4f6,pega-team04-e6c2d9,pega-team05-77af03,pega-team06-c94b1e,pega-team07-2a8d5c,pega-team08-f03e91,pega-team09-4b7c2a,pega-team10-9e1f68
       - key: OAUTH_CLIENT_ID
@@ -16,3 +17,19 @@ services:
         generateValue: true
       - key: TOKEN_TTL_SECONDS
         value: "3600"
+
+      # --- Pega AI Week: Mobile Club Nord ------------------------------------
+      # Separate key set so the two cohorts can be managed and revoked
+      # independently of each other.
+      - key: MCN_API_KEYS
+        value: mcn-team01-4ab19c,mcn-team02-7fe30d,mcn-team03-c25b84,mcn-team04-19da6f,mcn-team05-b8027e,mcn-team06-5c6a13,mcn-team07-e4719b,mcn-team08-20fd58,mcn-team09-96c3e7,mcn-team10-d781f2
+      # Seconds per status step in the card production service. 60 means a card
+      # reaches ZUGESTELLT in 3-4 minutes — long enough to watch a wait step do
+      # its job, short enough to fit inside an exercise. Lower it to 10 for a
+      # demo, raise it to 300 if you want the SLA escalation in US 8 to fire.
+      - key: MCN_CARD_STEP_SECONDS
+        value: "60"
+      # Delay for the 'Langsam' trigger surname, used to provoke connector
+      # timeouts on purpose.
+      - key: MCN_SLOW_RESPONSE_MS
+        value: "25000"

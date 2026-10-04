@@ -1,0 +1,208 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Mobile Club Nord — Kartenproduktion",
+    "version": "1.0.0",
+    "description": "Beauftragt die Mitgliedskarte und liefert einen Status, der sich über die Zeit verändert (Standard: eine Stufe je 60 Sekunden). Grundlage für Wait-Step und Child Case in US 8. Der Dienst ist zustandslos: die Auftragsnummer kodiert Zeitpunkt, Tarif und Mitgliedsnummer-Endung, der Status ist eine reine Funktion aus Auftragsnummer und Uhrzeit."
+  },
+  "servers": [
+    { "url": "https://pega-mock-bank-apis.onrender.com/mcn/karten/v1", "description": "Render (Training)" },
+    { "url": "http://localhost:3000/mcn/karten/v1", "description": "Lokal" }
+  ],
+  "security": [{ "ApiKeyAuth": [] }],
+  "tags": [{ "name": "Kartenauftraege" }],
+  "paths": {
+    "/kartenauftraege": {
+      "post": {
+        "tags": ["Kartenauftraege"],
+        "summary": "Kartenauftrag anlegen",
+        "operationId": "kartenauftragAnlegen",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Auftragsanfrage" },
+              "example": {
+                "mitgliedsnummer": "MCN-2024-000004",
+                "name": "Famke Familjen",
+                "adresse": {
+                  "strasse": "Mühlenkamp",
+                  "hausnummer": "17",
+                  "postleitzahl": "22303",
+                  "ort": "Hamburg"
+                },
+                "tarif": "Plus"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Auftrag angenommen",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Kartenauftrag" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Fehler" },
+          "401": { "$ref": "#/components/responses/Fehler" },
+          "404": { "$ref": "#/components/responses/Fehler" },
+          "503": {
+            "description": "Kartenproduktion nicht erreichbar (Mitgliedsnummer endet auf 98)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Fehler" } }
+            }
+          }
+        }
+      }
+    },
+    "/kartenauftraege/{auftragsnummer}": {
+      "get": {
+        "tags": ["Kartenauftraege"],
+        "summary": "Status abfragen",
+        "description": "Statusfolge Basis: ANGENOMMEN → IN_PRODUKTION → VERSENDET → ZUGESTELLT. Bei Tarif Plus liegt PERSONALISIERUNG zwischen IN_PRODUKTION und VERSENDET. Ab VERSENDET wird eine Sendungsnummer mitgeliefert.",
+        "operationId": "kartenauftragLesen",
+        "parameters": [
+          {
+            "name": "auftragsnummer",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "pattern": "^KA-\\d{4}-[0-9A-Z]+-[BP]\\d{2}$" },
+            "example": "KA-2026-M8X2K9-P12"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aktueller Stand",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Kartenauftrag" } }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Fehler" },
+          "404": { "$ref": "#/components/responses/Fehler" }
+        }
+      }
+    },
+    "/kartenauftraege/{auftragsnummer}/stornierung": {
+      "post": {
+        "tags": ["Kartenauftraege"],
+        "summary": "Kartenauftrag stornieren",
+        "description": "Möglich, solange der Status nicht VERSENDET oder ZUGESTELLT ist.",
+        "operationId": "kartenauftragStornieren",
+        "parameters": [
+          {
+            "name": "auftragsnummer",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "example": "KA-2026-M8X2K9-P12"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Storniert",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "auftragsnummer": { "type": "string" },
+                    "status": { "type": "string", "enum": ["STORNIERT"] },
+                    "storniertAm": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Fehler" },
+          "404": { "$ref": "#/components/responses/Fehler" },
+          "409": {
+            "description": "Bereits versendet — Stornierung nicht mehr möglich",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Fehler" } }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": { "type": "apiKey", "in": "header", "name": "x-api-key" }
+    },
+    "responses": {
+      "Fehler": {
+        "description": "Fehler",
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/Fehler" } }
+        }
+      }
+    },
+    "schemas": {
+      "Fehler": {
+        "type": "object",
+        "properties": {
+          "fehlercode": {
+            "type": "string",
+            "enum": [
+              "PFLICHTFELD_FEHLT",
+              "UNGUELTIGER_TARIF",
+              "MITGLIED_UNBEKANNT",
+              "AUFTRAG_UNBEKANNT",
+              "STORNIERUNG_NICHT_MOEGLICH",
+              "PRODUKTION_NICHT_ERREICHBAR"
+            ]
+          },
+          "meldung": { "type": "string" }
+        },
+        "required": ["fehlercode", "meldung"]
+      },
+      "Adresse": {
+        "type": "object",
+        "properties": {
+          "strasse": { "type": "string" },
+          "hausnummer": { "type": "string" },
+          "postleitzahl": { "type": "string" },
+          "ort": { "type": "string" }
+        }
+      },
+      "Auftragsanfrage": {
+        "type": "object",
+        "properties": {
+          "mitgliedsnummer": { "type": "string", "pattern": "^MCN-\\d{4}-\\d{6}$" },
+          "name": { "type": "string" },
+          "adresse": { "$ref": "#/components/schemas/Adresse" },
+          "tarif": { "type": "string", "enum": ["Basis", "Plus"] }
+        },
+        "required": ["mitgliedsnummer"]
+      },
+      "Kartenauftrag": {
+        "type": "object",
+        "properties": {
+          "auftragsnummer": { "type": "string", "example": "KA-2026-M8X2K9-P12" },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ANGENOMMEN",
+              "IN_PRODUKTION",
+              "PERSONALISIERUNG",
+              "VERSENDET",
+              "ZUGESTELLT",
+              "STORNIERT"
+            ]
+          },
+          "tarif": { "type": "string", "enum": ["Basis", "Plus"] },
+          "mitgliedsnummer": { "type": "string" },
+          "name": { "type": "string" },
+          "adresse": { "$ref": "#/components/schemas/Adresse" },
+          "sendungsnummer": {
+            "type": "string",
+            "description": "Erst ab Status VERSENDET vorhanden."
+          },
+          "erstelltAm": { "type": "string", "format": "date-time" },
+          "aktualisiertAm": { "type": "string", "format": "date-time" },
+          "voraussichtlicheZustellung": { "type": "string", "format": "date" }
+        }
+      }
+    }
+  }
+}

@@ -1,67 +1,514 @@
 {
   "info": {
-    "name": "Pega Training - Mock Bank APIs",
+    "name": "Pega Training - Mock APIs (Bank + Mobile Club Nord)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:3000" },
-    { "key": "apiKey", "value": "pega-team01-8f2c1a" },
-    { "key": "lastName", "value": "Berger" },
-    { "key": "dateOfBirth", "value": "1992-02-03" },
-    { "key": "ssn", "value": "111-22-1001" },
-    { "key": "accessToken", "value": "" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "apiKey",
+      "value": "pega-team01-8f2c1a"
+    },
+    {
+      "key": "lastName",
+      "value": "Berger"
+    },
+    {
+      "key": "dateOfBirth",
+      "value": "1992-02-03"
+    },
+    {
+      "key": "ssn",
+      "value": "111-22-1001"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "mcnApiKey",
+      "value": "mcn-team01-4ab19c"
+    },
+    {
+      "key": "mitgliedsnummer",
+      "value": "MCN-2024-000004"
+    },
+    {
+      "key": "auftragsnummer",
+      "value": ""
+    },
+    {
+      "key": "idempotencyKey",
+      "value": "CASE-4711"
+    }
   ],
   "item": [
     {
-      "name": "1a. Applicant Search - ambiguous (multiple matches) - GET",
-      "request": {
-        "method": "GET",
-        "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
-        "url": "{{baseUrl}}/applicants/v1/search?lastName={{lastName}}"
-      }
-    },
-    {
-      "name": "1b. Applicant Search - disambiguated with DOB - GET",
-      "request": {
-        "method": "GET",
-        "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
-        "url": "{{baseUrl}}/applicants/v1/search?lastName={{lastName}}&dateOfBirth={{dateOfBirth}}"
-      }
-    },
-    {
-      "name": "2. OAuth2 Token (Client Credentials) - POST",
-      "event": [
+      "name": "Large App Build - Mock Bank APIs",
+      "item": [
         {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "const json = pm.response.json();",
-              "pm.collectionVariables.set('accessToken', json.access_token);"
-            ]
+          "name": "1a. Applicant Search - ambiguous (multiple matches) - GET",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/applicants/v1/search?lastName={{lastName}}"
+          }
+        },
+        {
+          "name": "1b. Applicant Search - disambiguated with DOB - GET",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/applicants/v1/search?lastName={{lastName}}&dateOfBirth={{dateOfBirth}}"
+          }
+        },
+        {
+          "name": "2. OAuth2 Token (Client Credentials) - POST",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('accessToken', json.access_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials"
+                },
+                {
+                  "key": "client_id",
+                  "value": "pega-bank-client"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "pega-bank-secret"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/oauth/token"
+          }
+        },
+        {
+          "name": "3. Credit Bureau Score (Bearer) - GET",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/credit-bureau/v1/creditscore/{{ssn}}"
           }
         }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
-        "body": {
-          "mode": "urlencoded",
-          "urlencoded": [
-            { "key": "grant_type", "value": "client_credentials" },
-            { "key": "client_id", "value": "pega-bank-client" },
-            { "key": "client_secret", "value": "pega-bank-secret" }
-          ]
-        },
-        "url": "{{baseUrl}}/oauth/token"
-      }
+      ]
     },
     {
-      "name": "3. Credit Bureau Score (Bearer) - GET",
-      "request": {
-        "method": "GET",
-        "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
-        "url": "{{baseUrl}}/credit-bureau/v1/creditscore/{{ssn}}"
-      }
+      "name": "AI Week - MCN Bestandssystem",
+      "item": [
+        {
+          "name": "1. Dublettensuche - Treffer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{mcnApiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/mcn/mitglieder/v1/mitglieder/suche",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nachname\": \"Dublettski\",\n  \"geburtsdatum\": \"1981-04-17\"\n}"
+            },
+            "description": "Treffergüte 95 bei Nachname + Geburtsdatum."
+          }
+        },
+        {
+          "name": "2. Dublettensuche - mehrere Treffer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{mcnApiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/mcn/mitglieder/v1/mitglieder/suche",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nachname\": \"Petersen\"\n}"
+            },
+            "description": "Nur Nachname: mehrere Treffer mit Güte 30 - fuer die Disambiguierungsuebung."
+          }
+        },
+        {
+          "name": "3. Anlage - Erfolg (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{mcnApiKey}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/mcn/mitglieder/v1/mitglieder",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hauptmitglied\": {\n    \"vorname\": \"Anna\",\n    \"nachname\": \"Neumitglied\",\n    \"geburtsdatum\": \"1994-03-12\",\n    \"email\": \"anna@example.de\"\n  },\n  \"adresse\": {\n    \"strasse\": \"Mühlenkamp\",\n    \"hausnummer\": \"17\",\n    \"postleitzahl\": \"22303\",\n    \"ort\": \"Hamburg\"\n  },\n  \"tarif\": \"Plus\",\n  \"eintrittsdatum\": \"2026-11-01\",\n  \"zahlungsart\": \"SEPA\",\n  \"iban\": \"DE02120300000000202051\",\n  \"familienmitglieder\": [\n    {\n      \"vorname\": \"Jonas\",\n      \"nachname\": \"Neumitglied\",\n      \"geburtsdatum\": \"2015-08-04\",\n      \"beziehung\": \"Kind\"\n    }\n  ]\n}"
+            },
+            "description": "Legt die Mitgliedschaft an. Die Mitgliedsnummer wird in {{mitgliedsnummer}} gespeichert."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.mitgliedsnummer) pm.collectionVariables.set('mitgliedsnummer', j.mitgliedsnummer);",
+                  "pm.test('201 oder 200 (idempotent)', () => pm.expect([200,201]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. Anlage - Wiederholung mit gleichem Idempotency-Key (200)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{mcnApiKey}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/mcn/mitglieder/v1/mitglieder",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hauptmitglied\": {\n    \"vorname\": \"Anna\",\n    \"nachname\": \"Neumitglied\",\n    \"geburtsdatum\": \"1994-03-12\"\n  }\n}"
+            },
+            "description": "Gleiche Nummer, keine zweite Mitgliedschaft. Ohne diesen Header waere die Antwort 409."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 und idempotent', () => { pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().idempotent).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5. Anlage - Dublette (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{mcnApiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/mcn/mitglieder/v1/mitglieder",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hauptmitglied\": {\n    \"vorname\": \"Dirk\",\n    \"nachname\": \"Dublettski\",\n    \"geburtsdatum\": \"1981-04-17\"\n  }\n}"
+            },
+            "description": "Trigger-Nachname 'Dublettski' - liefert immer 409 mit bestehender Mitgliedsnummer."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409 DUBLETTE', () => { pm.response.to.have.status(409);",
+                  "  pm.expect(pm.response.json().fehlercode).to.eql('DUBLETTE'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6. Anlage - technischer Fehler (503)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{mcnApiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/mcn/mitglieder/v1/mitglieder",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hauptmitglied\": {\n    \"vorname\": \"Sue\",\n    \"nachname\": \"Systemfehler\",\n    \"geburtsdatum\": \"1990-01-01\"\n  }\n}"
+            },
+            "description": "Trigger-Nachname 'Systemfehler' - liefert immer 503."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('503', () => pm.response.to.have.status(503));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "7. Anlage - langsame Antwort (Timeout-Test)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{mcnApiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/mcn/mitglieder/v1/mitglieder",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hauptmitglied\": {\n    \"vorname\": \"Lang\",\n    \"nachname\": \"Langsam\",\n    \"geburtsdatum\": \"1990-01-01\"\n  }\n}"
+            },
+            "description": "Trigger-Nachname 'Langsam' - antwortet erst nach 25 Sekunden. Fuer Connector-Timeouts."
+          }
+        },
+        {
+          "name": "8. Mitgliedschaft lesen",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{mcnApiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/mcn/mitglieder/v1/mitglieder/{{mitgliedsnummer}}",
+            "description": "Liest die zuletzt angelegte Mitgliedschaft."
+          }
+        },
+        {
+          "name": "9. Familienmitgliedschaft lesen (Seed)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{mcnApiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/mcn/mitglieder/v1/mitglieder/MCN-2024-000004",
+            "description": "Seed-Datensatz mit drei Familienmitgliedern - stabil ueber Neustarts."
+          }
+        }
+      ]
+    },
+    {
+      "name": "AI Week - MCN Kartenproduktion",
+      "item": [
+        {
+          "name": "1. Kartenauftrag anlegen (202)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{mcnApiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/mcn/karten/v1/kartenauftraege",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mitgliedsnummer\": \"MCN-2024-000004\",\n  \"name\": \"Famke Familjen\",\n  \"adresse\": {\n    \"strasse\": \"Mühlenkamp\",\n    \"hausnummer\": \"17\",\n    \"postleitzahl\": \"22303\",\n    \"ort\": \"Hamburg\"\n  },\n  \"tarif\": \"Plus\"\n}"
+            },
+            "description": "Speichert die Auftragsnummer in {{auftragsnummer}}."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.auftragsnummer) pm.collectionVariables.set('auftragsnummer', j.auftragsnummer);",
+                  "pm.test('202 ANGENOMMEN', () => { pm.response.to.have.status(202);",
+                  "  pm.expect(j.status).to.eql('ANGENOMMEN'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Status abfragen (wiederholt aufrufen)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{mcnApiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/mcn/karten/v1/kartenauftraege/{{auftragsnummer}}",
+            "description": "Alle 60 Sekunden eine Stufe weiter: ANGENOMMEN -> IN_PRODUKTION -> (PERSONALISIERUNG bei Plus) -> VERSENDET -> ZUGESTELLT."
+          }
+        },
+        {
+          "name": "3. Kartenauftrag stornieren",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{mcnApiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/mcn/karten/v1/kartenauftraege/{{auftragsnummer}}/stornierung",
+            "description": "Nur moeglich, solange nicht VERSENDET oder ZUGESTELLT - sonst 409."
+          }
+        },
+        {
+          "name": "4. Auftrag bleibt haengen (SLA-Test)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{mcnApiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/mcn/karten/v1/kartenauftraege",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mitgliedsnummer\": \"MCN-2025-000099\",\n  \"tarif\": \"Basis\"\n}"
+            },
+            "description": "Mitgliedsnummer endet auf 99 - der Auftrag bleibt dauerhaft in IN_PRODUKTION."
+          }
+        },
+        {
+          "name": "5. Produktion nicht erreichbar (503)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{mcnApiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/mcn/karten/v1/kartenauftraege",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mitgliedsnummer\": \"MCN-2025-000098\",\n  \"tarif\": \"Plus\"\n}"
+            },
+            "description": "Mitgliedsnummer endet auf 98 - die Anlage schlaegt immer fehl."
+          }
+        }
+      ]
+    },
+    {
+      "name": "AI Week - OpenAPI",
+      "item": [
+        {
+          "name": "OpenAPI - Bestandssystem",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/mcn/mitglieder/v1/openapi.json",
+            "description": "Ohne API-Key erreichbar - diese URL in den Pega REST-Integrationsassistenten geben."
+          }
+        },
+        {
+          "name": "OpenAPI - Kartenproduktion",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/mcn/karten/v1/openapi.json",
+            "description": "Ohne API-Key erreichbar."
+          }
+        }
+      ]
     }
   ]
 }

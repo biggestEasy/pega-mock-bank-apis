@@ -1,0 +1,305 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Mobile Club Nord — Mitglieder-Bestandssystem",
+    "version": "1.0.0",
+    "description": "Führendes System für Mitgliedschaften des Mobile Club Nord. Dublettensuche, Anlage einer Mitgliedschaft und Lesezugriff. Alle Antworten sind deterministisch: derselbe Eingabewert erzeugt immer dieselbe Antwort."
+  },
+  "servers": [
+    { "url": "https://pega-mock-bank-apis.onrender.com/mcn/mitglieder/v1", "description": "Render (Training)" },
+    { "url": "http://localhost:3000/mcn/mitglieder/v1", "description": "Lokal" }
+  ],
+  "security": [{ "ApiKeyAuth": [] }],
+  "tags": [{ "name": "Mitglieder" }],
+  "paths": {
+    "/mitglieder/suche": {
+      "post": {
+        "tags": ["Mitglieder"],
+        "summary": "Dublettensuche",
+        "description": "Sucht bestehende Mitgliedschaften. Treffergüte: Nachname + Geburtsdatum = 95, Nachname + Postleitzahl = 60, nur Nachname = 30.",
+        "operationId": "sucheMitglieder",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Suchanfrage" },
+              "example": {
+                "vorname": "Anna",
+                "nachname": "Petersen",
+                "geburtsdatum": "1994-03-12",
+                "postleitzahl": "20249"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Trefferliste (auch leer)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Suchergebnis" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Fehler" },
+          "401": { "$ref": "#/components/responses/Fehler" }
+        }
+      }
+    },
+    "/mitglieder": {
+      "post": {
+        "tags": ["Mitglieder"],
+        "summary": "Mitgliedschaft anlegen",
+        "description": "Legt eine Mitgliedschaft an und vergibt die Mitgliedsnummer. Der Header Idempotency-Key wird ausgewertet: ein wiederholter Aufruf mit demselben Schlüssel liefert 200 und dieselbe Mitgliedsnummer, ohne eine zweite Mitgliedschaft anzulegen.",
+        "operationId": "mitgliedschaftAnlegen",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "Frei wählbarer Schlüssel des Aufrufers. Empfohlen: die Pega Case-ID."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Anlageanfrage" },
+              "example": {
+                "hauptmitglied": {
+                  "vorname": "Anna",
+                  "nachname": "Petersen",
+                  "geburtsdatum": "1994-03-12",
+                  "email": "anna.petersen@example.de"
+                },
+                "adresse": {
+                  "strasse": "Mühlenkamp",
+                  "hausnummer": "17",
+                  "postleitzahl": "22303",
+                  "ort": "Hamburg"
+                },
+                "tarif": "Plus",
+                "eintrittsdatum": "2026-11-01",
+                "zahlungsart": "SEPA",
+                "iban": "DE02120300000000202051",
+                "familienmitglieder": [
+                  {
+                    "vorname": "Jonas",
+                    "nachname": "Petersen",
+                    "geburtsdatum": "2015-08-04",
+                    "beziehung": "Kind"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Mitgliedschaft angelegt",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Mitgliedschaft" } }
+            }
+          },
+          "200": {
+            "description": "Bereits mit diesem Idempotency-Key angelegt — dieselbe Mitgliedsnummer, keine zweite Mitgliedschaft",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Mitgliedschaft" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Fehler" },
+          "401": { "$ref": "#/components/responses/Fehler" },
+          "409": {
+            "description": "Dublette — zu dieser Person besteht bereits eine Mitgliedschaft",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Fehler" },
+                "example": {
+                  "fehlercode": "DUBLETTE",
+                  "meldung": "Zu dieser Person besteht bereits eine Mitgliedschaft.",
+                  "bestehendeMitgliedsnummer": "MCN-2023-000001"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Bestandssystem nicht erreichbar",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Fehler" },
+                "example": {
+                  "fehlercode": "SYSTEM_NICHT_ERREICHBAR",
+                  "meldung": "Das Bestandssystem ist derzeit nicht erreichbar. Bitte später erneut versuchen."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mitglieder/{mitgliedsnummer}": {
+      "get": {
+        "tags": ["Mitglieder"],
+        "summary": "Mitgliedschaft lesen",
+        "operationId": "mitgliedschaftLesen",
+        "parameters": [
+          {
+            "name": "mitgliedsnummer",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "pattern": "^MCN-\\d{4}-\\d{6}$" },
+            "example": "MCN-2024-000004"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mitgliedschaft",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Mitgliedschaft" } }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Fehler" },
+          "404": { "$ref": "#/components/responses/Fehler" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": { "type": "apiKey", "in": "header", "name": "x-api-key" }
+    },
+    "responses": {
+      "Fehler": {
+        "description": "Fehler",
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/Fehler" } }
+        }
+      }
+    },
+    "schemas": {
+      "Fehler": {
+        "type": "object",
+        "properties": {
+          "fehlercode": {
+            "type": "string",
+            "enum": [
+              "PFLICHTFELD_FEHLT",
+              "UNGUELTIGER_TARIF",
+              "IBAN_FEHLT",
+              "DUBLETTE",
+              "NICHT_GEFUNDEN",
+              "SYSTEM_NICHT_ERREICHBAR"
+            ]
+          },
+          "meldung": { "type": "string" },
+          "bestehendeMitgliedsnummer": { "type": "string" }
+        },
+        "required": ["fehlercode", "meldung"]
+      },
+      "Adresse": {
+        "type": "object",
+        "properties": {
+          "strasse": { "type": "string" },
+          "hausnummer": { "type": "string" },
+          "postleitzahl": { "type": "string" },
+          "ort": { "type": "string" }
+        }
+      },
+      "Person": {
+        "type": "object",
+        "properties": {
+          "vorname": { "type": "string" },
+          "nachname": { "type": "string" },
+          "geburtsdatum": { "type": "string", "format": "date" },
+          "email": { "type": "string" }
+        },
+        "required": ["nachname", "geburtsdatum"]
+      },
+      "Familienmitglied": {
+        "type": "object",
+        "properties": {
+          "vorname": { "type": "string" },
+          "nachname": { "type": "string" },
+          "geburtsdatum": { "type": "string", "format": "date" },
+          "beziehung": {
+            "type": "string",
+            "enum": ["Partner", "Partnerin", "Kind", "Sonstige"]
+          },
+          "altersklasse": {
+            "type": "string",
+            "enum": ["Kind", "Junger Erwachsener", "Erwachsener"],
+            "description": "Wird vom Dienst anhand des Eintrittsdatums gesetzt."
+          }
+        }
+      },
+      "Suchanfrage": {
+        "type": "object",
+        "properties": {
+          "vorname": { "type": "string" },
+          "nachname": { "type": "string" },
+          "geburtsdatum": { "type": "string", "format": "date" },
+          "postleitzahl": { "type": "string" }
+        },
+        "required": ["nachname"]
+      },
+      "Treffer": {
+        "type": "object",
+        "properties": {
+          "mitgliedsnummer": { "type": "string" },
+          "name": { "type": "string" },
+          "geburtsdatum": { "type": "string", "format": "date" },
+          "status": { "type": "string", "enum": ["Aktiv", "Ruhend", "Beendet"] },
+          "eintrittsdatum": { "type": "string", "format": "date" },
+          "trefferguete": { "type": "integer", "minimum": 0, "maximum": 100 }
+        }
+      },
+      "Suchergebnis": {
+        "type": "object",
+        "properties": {
+          "anzahl": { "type": "integer" },
+          "treffer": { "type": "array", "items": { "$ref": "#/components/schemas/Treffer" } }
+        }
+      },
+      "Anlageanfrage": {
+        "type": "object",
+        "properties": {
+          "hauptmitglied": { "$ref": "#/components/schemas/Person" },
+          "adresse": { "$ref": "#/components/schemas/Adresse" },
+          "tarif": { "type": "string", "enum": ["Basis", "Plus"] },
+          "eintrittsdatum": { "type": "string", "format": "date" },
+          "zahlungsart": { "type": "string", "enum": ["SEPA", "Rechnung"] },
+          "iban": { "type": "string", "description": "Pflicht bei Zahlungsart SEPA." },
+          "familienmitglieder": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Familienmitglied" }
+          }
+        },
+        "required": ["hauptmitglied"]
+      },
+      "Mitgliedschaft": {
+        "type": "object",
+        "properties": {
+          "mitgliedsnummer": { "type": "string", "example": "MCN-2026-000712" },
+          "status": { "type": "string", "enum": ["Aktiv", "Ruhend", "Beendet"] },
+          "tarif": { "type": "string", "enum": ["Basis", "Plus"] },
+          "eintrittsdatum": { "type": "string", "format": "date" },
+          "zahlungsart": { "type": "string", "enum": ["SEPA", "Rechnung"] },
+          "hauptmitglied": { "$ref": "#/components/schemas/Person" },
+          "adresse": { "$ref": "#/components/schemas/Adresse" },
+          "familienmitglieder": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Familienmitglied" }
+          },
+          "monatsbeitrag": {
+            "type": "number",
+            "description": "Summe der Beiträge nach US 2: 18–27 Jahre Basis 8 € / Plus 12 €, ab 28 Jahren Basis 12 € / Plus 18 €, Kinder 0 €."
+          },
+          "angelegtAm": { "type": "string", "format": "date-time" },
+          "idempotent": {
+            "type": "boolean",
+            "description": "true, wenn die Antwort aus einem wiederholten Aufruf mit bekanntem Idempotency-Key stammt."
+          }
+        }
+      }
+    }
+  }
+}
